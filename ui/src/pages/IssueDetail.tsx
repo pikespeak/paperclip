@@ -1205,6 +1205,7 @@ type IssueDetailChatTabProps = {
   onOpenSkill?: (skillId: string, name: string) => void;
   issueId: string;
   companyId: string;
+  companyPrefix?: string | null;
   projectId: string | null;
   issueStatus: Issue["status"];
   /** Marks cross-issue agent comments in the thread (the open cross-task write design (attribution)). */
@@ -1373,6 +1374,7 @@ const IssueDetailChatTab = memo(function IssueDetailChatTab({
   onOpenSkill,
   issueId,
   companyId,
+  companyPrefix = null,
   projectId,
   issueWorkMode,
   issueStatus,
@@ -2740,6 +2742,7 @@ const IssueDetailChatTab = memo(function IssueDetailChatTab({
             canFalsePositiveRecoveryAction={canFalsePositiveRecoveryAction}
             legacyRecoverySourceIssue={legacyRecoverySourceIssue ?? null}
             companyId={companyId}
+            companyPrefix={companyPrefix}
             projectId={projectId}
             issueStatus={issueStatus}
             issueAssigneeAgentId={issueAssigneeAgentId}
@@ -8622,6 +8625,7 @@ export function TaskDetailSurface({ conversation, tasksTab }: { tasksTab?: TaskS
                   }
                   issueId={conversation && !conversation.issue ? "" : issue.id}
                   companyId={issue.companyId}
+                  companyPrefix={companyPrefix}
                   projectId={issue.projectId ?? null}
                   issueStatus={issue.status}
                   issueAssigneeAgentId={issue.assigneeAgentId}
