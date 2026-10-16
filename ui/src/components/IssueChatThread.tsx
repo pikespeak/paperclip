@@ -150,6 +150,7 @@ import {
 } from "./MarkdownBody";
 import type { TaskChatIssueBrief } from "./task-chat/TaskChatDescriptionBubble";
 import { WorkspaceFileMarkdownBody } from "./WorkspaceFileMarkdownBody";
+import { PluginSlotOutlet } from "@/plugins/slots";
 import {
   MarkdownEditor,
   type MentionOption,
@@ -268,6 +269,11 @@ import { resolveCommentAttribution } from "../lib/comment-attribution";
 interface IssueChatMessageContext {
   feedbackDataSharingPreference: FeedbackDataSharingPreference;
   feedbackTermsUrl: string | null;
+  /** Slot context for per-comment plugin outlets (commentAnnotation etc.). */
+  companyId?: string | null;
+  projectId?: string | null;
+  issueId?: string | null;
+  companyPrefix?: string | null;
   agentMap?: Map<string, Agent>;
   currentUserId?: string | null;
   userLabelMap?: ReadonlyMap<string, string> | null;
@@ -343,6 +349,55 @@ const IssueChatCtx = createContext<IssueChatMessageContext>({
 
 const AGENT_COMMENT_BUBBLE_WIDTH_CLASS =
   "max-w-(--sz-calc-7) sm:max-w-(--pct-85)";
+
+/**
+ * Per-comment plugin slot outlets, matching the mounts the classic
+ * CommentThread already renders: `commentAnnotation` below the comment and
+ * `commentContextMenuItem` alongside its actions, with the SDK-documented
+ * context (entityId the comment, parentEntityId the issue). Renders nothing
+ * without a company, matching CommentThread's gating.
+ */
+function CommentPluginSlots({
+  commentId,
+  variant,
+}: {
+  commentId: string;
+  variant: "annotation" | "menu";
+}) {
+  const { companyId, companyPrefix, projectId, issueId } =
+    useContext(IssueChatCtx);
+  if (!companyId) return null;
+  const context = {
+    companyId,
+    companyPrefix: companyPrefix ?? null,
+    projectId: projectId ?? null,
+    entityId: commentId,
+    entityType: "comment" as const,
+    parentEntityId: issueId ?? null,
+  };
+  if (variant === "menu") {
+    return (
+      <PluginSlotOutlet
+        slotTypes={["commentContextMenuItem"]}
+        entityType="comment"
+        context={context}
+        className="flex flex-wrap items-center gap-1.5"
+        itemClassName="inline-flex"
+        missingBehavior="placeholder"
+      />
+    );
+  }
+  return (
+    <PluginSlotOutlet
+      slotTypes={["commentAnnotation"]}
+      entityType="comment"
+      context={context}
+      className="space-y-2"
+      itemClassName="rounded-md"
+      missingBehavior="placeholder"
+    />
+  );
+}
 
 export type IssueChatRunFinalizationAction = {
   id: "cancel" | "done";
@@ -607,6 +662,7 @@ interface IssueChatThreadProps {
   onRetryFailedRun?: (runId: string) => Promise<void> | void;
   retryFailedRunId?: string | null;
   companyId?: string | null;
+  companyPrefix?: string | null;
   projectId?: string | null;
   issueStatus?: string;
   agentMap?: Map<string, Agent>;
@@ -2238,8 +2294,16 @@ function IssueChatUserMessage({
               <Trash2 className="h-3.5 w-3.5" />
             </button>
           ) : null}
+          {!deleted ? (
+            <CommentPluginSlots commentId={commentId} variant="menu" />
+          ) : null}
         </div>
       )}
+      {!pending && !deleted ? (
+        <div className="mt-2 space-y-2">
+          <CommentPluginSlots commentId={commentId} variant="annotation" />
+        </div>
+      ) : null}
     </div>
   );
 
@@ -2467,6 +2531,9 @@ function IssueChatAssistantMessage({
           onVote={handleVote}
         />
       ) : null}
+      {isGenuineComment && commentId ? (
+        <CommentPluginSlots commentId={commentId} variant="menu" />
+      ) : null}
       <Tooltip>
         <TooltipTrigger asChild>
           <a
@@ -2619,6 +2686,11 @@ function IssueChatAssistantMessage({
             )}
           </div>
           {!deleted ? messageActionBar : null}
+          {!deleted && commentId ? (
+            <div className="mt-2 space-y-2">
+              <CommentPluginSlots commentId={commentId} variant="annotation" />
+            </div>
+          ) : null}
         </div>
       </div>
     );
@@ -5788,6 +5860,7 @@ export function IssueChatThread({
   canFalsePositiveRecoveryAction = false,
   legacyRecoverySourceIssue = null,
   companyId,
+  companyPrefix = null,
   assigneeAdapterOverrides,
   projectId,
   issueStatus,
@@ -6528,6 +6601,10 @@ export function IssueChatThread({
     () => ({
       feedbackDataSharingPreference,
       feedbackTermsUrl,
+      companyId,
+      companyPrefix,
+      projectId,
+      issueId,
       agentMap,
       currentUserId,
       userLabelMap,
@@ -6557,6 +6634,10 @@ export function IssueChatThread({
     [
       feedbackDataSharingPreference,
       feedbackTermsUrl,
+      companyId,
+      companyPrefix,
+      projectId,
+      issueId,
       agentMap,
       currentUserId,
       userLabelMap,
